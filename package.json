@@ -1,7 +1,7 @@
 {
-  "name": "worker-example",
+  "name": "worker-example-copy",
   "version": "0.8.2",
-  "author": "DFST",
+  "author": "Turbo",
   "scripts": {
     "test": "jest",
     "local": "jest --chain=local --cloud=local --deploy=true --send=false --one=true --many=true",
@@ -28,7 +28,8 @@
   "packageManager": "yarn@4.5.2",
   "dependencies": {
     "o1js": "^2.1.0",
-    "zkcloudworker": "^0.18.15"
+    "zkcloudworker": "^0.18.15",
+    "zkcloudworker-cli": "^0.5.3"
   },
   "jest": {
     "preset": "ts-jest",

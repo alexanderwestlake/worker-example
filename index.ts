@@ -6,7 +6,7 @@ import {
   blockchain,
 } from "zkcloudworker";
 import { initializeBindings } from "o1js";
-import { AddWorker } from "./src/worker";
+import { ZKWorker } from "./src/worker";
 import packageJson from "./package.json";
 import { AddContract, AddProgram } from "./src/contract";
 
@@ -18,7 +18,7 @@ export async function zkcloudworker(cloud: Cloud): Promise<zkCloudWorker> {
   );
   await initializeBindings();
   await initBlockchain(cloud.chain);
-  return new AddWorker(cloud);
+  return new ZKWorker(cloud);
 }
 
 export async function verify(chain: blockchain): Promise<VerificationData> {

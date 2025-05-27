@@ -8,6 +8,7 @@ import {
   Cache,
   PublicKey,
   setNumberOfWorkers,
+  Field,
 } from "o1js";
 
 import {
@@ -22,10 +23,12 @@ import {
   accountBalanceMina,
 } from "zkcloudworker";
 import { zkcloudworker } from "..";
-import { AddContract, AddProgram, limit, AddValue } from "../src/contract";
 import { contract, DEPLOYER } from "./config";
 import packageJson from "../package.json";
 import { JWT } from "../env.json";
+import { Game2048ZKProgram, stateOperation, ZKContract } from "../src/game2048ZKProgram";
+import { Direction, GameBoard, GameBoardWithSeed } from "../src/game2048ZKLogic";
+import { BoardArray } from "../src/game2048ZKLogic";
 
 const ONE_ELEMENTS_NUMBER = 1;
 const MANY_ELEMENTS_NUMBER = 1;
@@ -60,24 +63,24 @@ const manyValues: number[][] = [];
 const contractPrivateKey = contract.contractPrivateKey;
 const contractPublicKey = contractPrivateKey.toPublicKey();
 
-const zkApp = new AddContract(contractPublicKey);
+const zkApp = new ZKContract(contractPublicKey);
 let programVerificationKey: VerificationKey;
 let contractVerificationKey: VerificationKey;
 let blockchainInitialized = false;
 
-describe("Add Worker", () => {
+describe("ZK Worker", () => {
   it(`should prepare data`, async () => {
     console.log("Preparing data...");
     console.time(`prepared data`);
-    for (let i = 0; i < ONE_ELEMENTS_NUMBER; i++) {
+    /*for (let i = 0; i < ONE_ELEMENTS_NUMBER; i++) {
       oneValues.push(1 + Math.floor(Math.random() * (limit - 2)));
-    }
+    }*/
     for (let i = 0; i < MANY_ELEMENTS_NUMBER; i++) {
-      const values: number[] = [];
+      const moves: number[] = [];
       for (let j = 0; j < MANY_BATCH_SIZE; j++) {
-        values.push(1 + Math.floor(Math.random() * (limit - 2)));
+        moves.push(1 + Math.floor(Math.random() * (4)));
       }
-      manyValues.push(values);
+      manyValues.push(moves);
     }
     console.timeEnd(`prepared data`);
   });
@@ -115,7 +118,6 @@ describe("Add Worker", () => {
     Memory.info("blockchain initialized");
     blockchainInitialized = true;
   });
-
   if (compile) {
     it(`should compile contract`, async () => {
       expect(blockchainInitialized).toBe(true);
@@ -123,11 +125,11 @@ describe("Add Worker", () => {
       console.time("methods analyzed");
       const methods = [
         {
-          name: "AddProgram",
-          result: await AddProgram.analyzeMethods(),
+          name: "ZKProgram",
+          result: await Game2048ZKProgram.analyzeMethods(),
           skip: true,
         },
-        { name: "AddContract", result: await AddContract.analyzeMethods() },
+        { name: "ZKContract", result: await ZKContract.analyzeMethods() },
       ];
       console.timeEnd("methods analyzed");
       const maxRows = 2 ** 16;
@@ -153,28 +155,28 @@ describe("Add Worker", () => {
       console.log("Compiling contracts...");
       const cache: Cache = Cache.FileSystem("./cache");
 
-      console.time("AddProgram compiled");
-      programVerificationKey = (await AddProgram.compile({ cache }))
+      console.time("Game2048ZKProgram compiled");
+      programVerificationKey = (await Game2048ZKProgram.compile({ cache }))
         .verificationKey;
-      console.timeEnd("AddProgram compiled");
+      console.timeEnd("Game2048ZKProgram compiled");
 
-      console.time("AddContract compiled");
-      contractVerificationKey = (await AddContract.compile({ cache }))
+      console.time("ZKContract compiled");
+      contractVerificationKey = (await ZKContract.compile({ cache }))
         .verificationKey;
-      console.timeEnd("AddContract compiled");
+      console.timeEnd("ZKContract compiled");
       console.timeEnd("compiled");
       console.log(
-        "AddContract verification key",
+        "ZKContract verification key",
         contractVerificationKey.hash.toJSON()
       );
       console.log(
-        "AddProgram verification key",
+        "Game2048ZKProgram verification key",
         programVerificationKey.hash.toJSON()
       );
       Memory.info("compiled");
     });
   }
-  if (deploy) {
+  /*if (deploy) {
     it(`should deploy contract`, async () => {
       expect(blockchainInitialized).toBe(true);
       console.log("Fetching sender account...");
@@ -186,8 +188,8 @@ describe("Add Worker", () => {
         { sender, fee: await fee(), memo: "deploy" },
         async () => {
           AccountUpdate.fundNewAccount(sender);
-          await zkApp.deploy({});
-          zkApp.account.zkappUri.set("https://zkcloudworker.com");
+          //await zkApp.deploy({});
+          //zkApp.account.zkappUri.set("https://zkcloudworker.com");
         }
       );
 
@@ -195,16 +197,15 @@ describe("Add Worker", () => {
       await sendTx(tx, "deploy");
       Memory.info("deployed");
     });
-  }
-
-  if (send) {
+  }*/
+  /*if (send) {
     it(`should send first one tx`, async () => {
       expect(blockchainInitialized).toBe(true);
       console.log(`Sending first one tx...`);
 
       await fetchMinaAccount({ publicKey: sender, force: true });
       await fetchMinaAccount({ publicKey: contractPublicKey, force: true });
-      const addValue = new AddValue({
+      /*const addValue = new AddValue({
         value: UInt64.from(100),
         limit: UInt64.from(limit),
       });
@@ -225,8 +226,8 @@ describe("Add Worker", () => {
       Memory.info("first one tx sent");
       await sleep(10000);
     });
-  }
-
+  }*/
+/*
   if (one) {
     it(`should send one transactions`, async () => {
       expect(blockchainInitialized).toBe(true);
@@ -268,7 +269,7 @@ describe("Add Worker", () => {
       Memory.info(`One txs sent`);
     });
   }
-
+  */
   if (many) {
     it(`should send transactions with recursive proofs`, async () => {
       expect(blockchainInitialized).toBe(true);
@@ -276,16 +277,38 @@ describe("Add Worker", () => {
       for (let i = 0; i < MANY_ELEMENTS_NUMBER; i++) {
         console.log(`Sending many tx ${i + 1}/${MANY_ELEMENTS_NUMBER}...`);
         const transactions: string[] = [];
+
+        const initBoard = new GameBoard([
+          Field(2),Field(0),Field(0),Field(0),
+          Field(0),Field(0),Field(0),Field(0),
+          Field(0),Field(0),Field(2),Field(0),
+          Field(0),Field(0),Field(0),Field(0),
+        ]);
+        const initSeed = Field(12877257879993356);
+        const dir = new Direction([Field(2), Field(1), Field(3), Field(4),
+          Field(2), Field(1), Field(3), Field(4), 
+          Field(2), Field(1), Field(3), Field(4), 
+          Field(2), Field(1), Field(3), Field(4), 
+          Field(2), Field(1), Field(3), Field(4),]);
+        let newBoard: GameBoard = initBoard;
+        let newSeed: Field = initSeed;
+        for(let i = 0; i < dir.value.length; i++) {
+          [newBoard, newSeed] = await stateOperation(newBoard, newSeed, dir.value[i]);
+        }
+        
         for (let j = 0; j < MANY_BATCH_SIZE; j++) {
           transactions.push(
             JSON.stringify({
-              addValue: serializeFields(
-                AddValue.toFields(
-                  new AddValue({
-                    value: UInt64.from(manyValues[i][j]),
-                    limit: UInt64.from(limit),
-                  })
+              boardArray: serializeFields(
+                BoardArray.toFields(
+                  new BoardArray([
+                    new GameBoardWithSeed({board: initBoard, seed: initSeed}),
+                    new GameBoardWithSeed({board: newBoard, seed: newSeed})
+                  ])
                 )
+              ),
+              directions: serializeFields(
+                Direction.toFields(dir)
               ),
             })
           );
@@ -317,7 +340,9 @@ describe("Add Worker", () => {
         expect(proofResult.result).toBeDefined();
         const proof = proofResult.result.result;
 
-        const verifyAnswer = await api.execute({
+        console.log("Proof:", proof);
+
+        /*const verifyAnswer = await api.execute({
           developer,
           repo,
           transactions: [],
@@ -362,13 +387,13 @@ describe("Add Worker", () => {
           jobId,
           printLogs: true,
         });
-        console.log("Many result:", manyResult.result.result);
+        console.log("Many result:", manyResult.result.result);*/
       }
       console.timeEnd(`Many txs sent`);
       Memory.info(`Many txs sent`);
     });
   }
-
+  
   if (files) {
     it(`should save and get files`, async () => {
       expect(blockchainInitialized).toBe(true);
@@ -551,4 +576,5 @@ async function sendTx(
     if (chain !== "zeko") console.error("Error sending tx", error);
   }
   if (chain !== "local") await sleep(10000);
+  
 }

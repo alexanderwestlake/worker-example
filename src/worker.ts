@@ -6,6 +6,7 @@ import {
   deserializeFields,
   fetchMinaAccount,
   accountBalanceMina,
+  serializeFields,
 } from "zkcloudworker";
 import {
   verify,
@@ -16,10 +17,12 @@ import {
   PrivateKey,
   AccountUpdate,
   Cache,
+  SelfProof,
 } from "o1js";
-import { AddContract, AddProgram, AddProgramProof, AddValue } from "./contract";
+import { Game2048ZKProgram, ZKContract, ZKProgramProof } from "./game2048ZKProgram";
+import { BoardArray, Direction, GameBoardWithSeed } from "./game2048ZKLogic";
 
-export class AddWorker extends zkCloudWorker {
+export class ZKWorker extends zkCloudWorker {
   static programVerificationKey: VerificationKey | undefined = undefined;
   static contractVerificationKey: VerificationKey | undefined = undefined;
   readonly cache: Cache;
@@ -32,10 +35,10 @@ export class AddWorker extends zkCloudWorker {
   private async compile(compileSmartContracts: boolean = true): Promise<void> {
     try {
       console.time("compiled");
-      if (AddWorker.programVerificationKey === undefined) {
+      if (ZKWorker.programVerificationKey === undefined) {
         console.time("compiled AddProgram");
-        AddWorker.programVerificationKey = (
-          await AddProgram.compile({
+        ZKWorker.programVerificationKey = (
+          await Game2048ZKProgram.compile({
             cache: this.cache,
           })
         ).verificationKey;
@@ -46,16 +49,17 @@ export class AddWorker extends zkCloudWorker {
         console.timeEnd("compiled");
         return;
       }
-
-      if (AddWorker.contractVerificationKey === undefined) {
+      
+      if (ZKWorker.contractVerificationKey === undefined) {
         console.time("compiled AddContract");
-        AddWorker.contractVerificationKey = (
-          await AddContract.compile({
+        ZKWorker.contractVerificationKey = (
+          await ZKContract.compile({
             cache: this.cache,
           })
         ).verificationKey;
         console.timeEnd("compiled AddContract");
       }
+      
       console.timeEnd("compiled");
     } catch (error) {
       console.error("Error in compile, restarting container", error);
@@ -70,15 +74,19 @@ export class AddWorker extends zkCloudWorker {
     console.time(msg);
     const args = JSON.parse(transaction);
 
-    const addValue: AddValue = AddValue.fromFields(
-      deserializeFields(args.addValue)
-    ) as AddValue;
+    const boardArray: BoardArray = BoardArray.fromFields(
+      deserializeFields(args.boardArray)
+    ) as BoardArray; 
+
+    const directions: Direction = Direction.fromFields(
+      deserializeFields(args.directions)
+    ) as Direction;
 
     await this.compile(false);
-    if (AddWorker.programVerificationKey === undefined)
+    if (ZKWorker.programVerificationKey === undefined)
       throw new Error("verificationKey is undefined");
 
-    const output = await AddProgram.create(addValue);
+    const output = await Game2048ZKProgram.baseCase(boardArray, directions);
     console.timeEnd(msg);
 
     return JSON.stringify(output.proof.toJSON(), null, 2);
@@ -91,26 +99,49 @@ export class AddWorker extends zkCloudWorker {
     const msg = `proof merged`;
     console.time(msg);
     await this.compile(false);
-    if (AddWorker.programVerificationKey === undefined)
+    if (ZKWorker.programVerificationKey === undefined)
       throw new Error("verificationKey is undefined");
 
-    const sourceProof1: AddProgramProof = await AddProgramProof.fromJSON(
+    const sourceProof1: ZKProgramProof = await ZKProgramProof.fromJSON(
       JSON.parse(proof1) as JsonProof
     );
-    const sourceProof2: AddProgramProof = await AddProgramProof.fromJSON(
+    const sourceProof2: ZKProgramProof = await ZKProgramProof.fromJSON(
       JSON.parse(proof2) as JsonProof
     );
 
-    const output = await AddProgram.merge(sourceProof1, sourceProof2);
-    const ok = await verify(
-      output.proof.toJSON(),
-      AddWorker.programVerificationKey
-    );
-    if (!ok) throw new Error("proof verification failed");
-    console.timeEnd(msg);
-    return JSON.stringify(output.proof.toJSON(), null, 2);
-  }
+    const output1 =JSON.stringify(
+      sourceProof1.publicOutput
+    )
+    const output2 =JSON.stringify(
+      sourceProof2.publicOutput
+    )
+    console.log("COMPARISON")
+    console.log("proof1", output1);
+    console.log("proof2", output2);
+    console.log("SEEDS COMPARISON")
+    console.log("sourceProof1.1", sourceProof1.publicOutput.value[0].seed);
+    console.log("sourceProof1.2", sourceProof1.publicOutput.value[1].seed);
+    console.log("sourceProof2.1", sourceProof2.publicOutput.value[0].seed);
+    console.log("sourceProof2.2", sourceProof2.publicOutput.value[1].seed);
+    if(output1 === output2) {
+      console.log("Proofs are equal");
+      console.timeEnd(msg);
+      return JSON.stringify(sourceProof1, null, 2);
+    } else {
+      console.log("Proofs are not equal");
+      const output = await Game2048ZKProgram.inductiveStep(sourceProof1, sourceProof2);
+      const ok = await verify(
+        output.proof.toJSON(),
+        ZKWorker.programVerificationKey
+      );
+      if (!ok) throw new Error("proof verification failed");
+      console.timeEnd(msg);
+      return JSON.stringify(output.proof.toJSON(), null, 2);
+    }
+    
 
+  }
+  /*
   public async execute(transactions: string[]): Promise<string | undefined> {
     if (this.cloud.args === undefined)
       throw new Error("this.cloud.args is undefined");
@@ -145,15 +176,15 @@ export class AddWorker extends zkCloudWorker {
 
   private async verifyProof(args: { proof: string }): Promise<string> {
     if (args.proof === undefined) throw new Error("args.proof is undefined");
-    const proof = (await AddProgramProof.fromJSON(
+    const proof = (await SelfProof.fromJSON(
       JSON.parse(args.proof) as JsonProof
-    )) as AddProgramProof;
+    )) as SelfProof<void, BoardArray>;
 
     await this.compile(false);
-    if (AddWorker.programVerificationKey === undefined)
+    if (ZKWorker.programVerificationKey === undefined)
       throw new Error("verificationKey is undefined");
 
-    const ok = await verify(proof, AddWorker.programVerificationKey);
+    const ok = await verify(proof, ZKWorker.programVerificationKey);
     if (ok) return "Proof verified";
     else return "Proof verification failed";
   }
@@ -255,9 +286,9 @@ export class AddWorker extends zkCloudWorker {
     let value: string;
     let limit: string;
     if (isMany) {
-      const proof = (await AddProgramProof.fromJSON(
+      const proof = (await SelfProof.fromJSON(
         JSON.parse(args.proof!) as JsonProof
-      )) as AddProgramProof;
+      )) as SelfProof<void, BoardArray>;
       value = proof.publicOutput.value.toJSON();
       limit = proof.publicOutput.limit.toJSON();
 
@@ -345,4 +376,5 @@ export class AddWorker extends zkCloudWorker {
       return "Error sending transaction";
     }
   }
+    */
 }
