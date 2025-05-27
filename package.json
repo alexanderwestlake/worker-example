@@ -1,6 +1,6 @@
 {
   "name": "worker-example-copy",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "author": "Turbo",
   "scripts": {
     "test": "jest",
@@ -28,6 +28,7 @@
   "packageManager": "yarn@4.5.2",
   "dependencies": {
     "o1js": "^2.1.0",
+    "ts-node": "^10.9.2",
     "zkcloudworker": "^0.18.15",
     "zkcloudworker-cli": "^0.5.3"
   },
