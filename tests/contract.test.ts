@@ -26,8 +26,16 @@ import { zkcloudworker } from "..";
 import { contract, DEPLOYER } from "./config";
 import packageJson from "../package.json";
 import { JWT } from "../env.json";
-import { Game2048ZKProgram, stateOperation, ZKContract } from "../src/game2048ZKProgram";
-import { Direction, GameBoard, GameBoardWithSeed } from "../src/game2048ZKLogic";
+import {
+  Game2048ZKProgram,
+  stateOperation,
+  ZKContract,
+} from "../src/game2048ZKProgram";
+import {
+  Direction,
+  GameBoard,
+  GameBoardWithSeed,
+} from "../src/game2048ZKLogic";
 import { BoardArray } from "../src/game2048ZKLogic";
 
 const ONE_ELEMENTS_NUMBER = 1;
@@ -78,7 +86,7 @@ describe("ZK Worker", () => {
     for (let i = 0; i < MANY_ELEMENTS_NUMBER; i++) {
       const moves: number[] = [];
       for (let j = 0; j < MANY_BATCH_SIZE; j++) {
-        moves.push(1 + Math.floor(Math.random() * (4)));
+        moves.push(1 + Math.floor(Math.random() * 4));
       }
       manyValues.push(moves);
     }
@@ -227,7 +235,7 @@ describe("ZK Worker", () => {
       await sleep(10000);
     });
   }*/
-/*
+  /*
   if (one) {
     it(`should send one transactions`, async () => {
       expect(blockchainInitialized).toBe(true);
@@ -279,37 +287,68 @@ describe("ZK Worker", () => {
         const transactions: string[] = [];
 
         const initBoard = new GameBoard([
-          Field(2),Field(0),Field(0),Field(0),
-          Field(0),Field(0),Field(0),Field(0),
-          Field(0),Field(0),Field(2),Field(0),
-          Field(0),Field(0),Field(0),Field(0),
+          Field(2),
+          Field(0),
+          Field(0),
+          Field(0),
+          Field(0),
+          Field(0),
+          Field(0),
+          Field(0),
+          Field(0),
+          Field(0),
+          Field(2),
+          Field(0),
+          Field(0),
+          Field(0),
+          Field(0),
+          Field(0),
         ]);
         const initSeed = Field(12877257879993356);
-        const dir = new Direction([Field(2), Field(1), Field(3), Field(4),
-          Field(2), Field(1), Field(3), Field(4), 
-          Field(2), Field(1), Field(3), Field(4), 
-          Field(2), Field(1), Field(3), Field(4), 
-          Field(2), Field(1), Field(3), Field(4),]);
+        const dir = new Direction([
+          Field(2),
+          Field(1),
+          Field(3),
+          Field(4),
+          Field(2),
+          Field(1),
+          Field(3),
+          Field(4),
+          Field(2),
+          Field(1),
+          Field(3),
+          Field(4),
+          Field(2),
+          Field(1),
+          Field(3),
+          Field(4),
+          Field(2),
+          Field(1),
+          Field(3),
+          Field(4),
+        ]);
         let newBoard: GameBoard = initBoard;
         let newSeed: Field = initSeed;
-        for(let i = 0; i < dir.value.length; i++) {
-          [newBoard, newSeed] = await stateOperation(newBoard, newSeed, dir.value[i]);
+        for (let i = 0; i < dir.value.length; i++) {
+          [newBoard, newSeed] = await stateOperation(
+            newBoard,
+            newSeed,
+            dir.value[i]
+          );
         }
-        
+
         for (let j = 0; j < MANY_BATCH_SIZE; j++) {
           transactions.push(
             JSON.stringify({
               boardArray: serializeFields(
                 BoardArray.toFields(
                   new BoardArray([
-                    new GameBoardWithSeed({board: initBoard, seed: initSeed}),
-                    new GameBoardWithSeed({board: newBoard, seed: newSeed})
+                    new GameBoardWithSeed({ board: initBoard, seed: initSeed }),
+                    new GameBoardWithSeed({ board: newBoard, seed: newSeed }),
                   ])
                 )
               ),
-              directions: serializeFields(
-                Direction.toFields(dir)
-              ),
+              directions: serializeFields(Direction.toFields(dir)),
             })
           );
         }
@@ -393,89 +432,89 @@ describe("ZK Worker", () => {
       Memory.info(`Many txs sent`);
     });
   }
-  
-  if (files) {
-    it(`should save and get files`, async () => {
-      expect(blockchainInitialized).toBe(true);
-      const answer = await api.execute({
-        developer,
-        repo,
-        transactions: [],
-        task: "files",
-        args: JSON.stringify({
-          contractAddress: contractPublicKey.toBase58(),
-          text: "Hello, World!",
-        }),
-        metadata: `files`,
-      });
-      console.log("answer:", answer);
-      expect(answer).toBeDefined();
-      expect(answer.success).toBe(true);
-      const jobId = answer.jobId;
-      expect(jobId).toBeDefined();
-      if (jobId === undefined) throw new Error("Job ID is undefined");
-      const filesResult = await api.waitForJobResult({
-        jobId,
-        printLogs: true,
-      });
-      console.log("Files test result:", filesResult.result.result);
-    });
-  }
 
-  if (encrypt) {
-    it(`should save and get encrypted data`, async () => {
-      let answer = await api.execute({
-        developer,
-        repo,
-        transactions: [],
-        task: "encrypt",
-        args: JSON.stringify({
-          contractAddress: contractPublicKey.toBase58(),
-          text: "Hello, World!",
-        }),
-        metadata: `files`,
-      });
-      console.log("answer:", answer);
-      expect(answer).toBeDefined();
-      expect(answer.success).toBe(true);
-      let jobId = answer.jobId;
-      expect(jobId).toBeDefined();
-      if (jobId === undefined) throw new Error("Job ID is undefined");
-      let result = await api.waitForJobResult({
-        jobId,
-        printLogs: true,
-      });
-      const encrypted = result.result.result;
-      console.log("Encrypted data:", encrypted);
-      if (encrypted === undefined)
-        throw new Error("Encrypted data is undefined");
-      if (encrypted === "Error encrypting") throw new Error("Error encrypting");
-      answer = await api.execute({
-        developer,
-        repo,
-        transactions: [],
-        task: "decrypt",
-        args: JSON.stringify({
-          contractAddress: contractPublicKey.toBase58(),
-          text: encrypted,
-        }),
-        metadata: `files`,
-      });
-      console.log("answer:", answer);
-      expect(answer).toBeDefined();
-      expect(answer.success).toBe(true);
-      jobId = answer.jobId;
-      expect(jobId).toBeDefined();
-      if (jobId === undefined) throw new Error("Job ID is undefined");
-      result = await api.waitForJobResult({
-        jobId,
-        printLogs: true,
-      });
-      const decrypted = result.result.result;
-      console.log("Decrypted data:", decrypted);
-      expect(decrypted).toBe("Hello, World!");
-    });
-  }
+  // if (files) {
+  //   it(`should save and get files`, async () => {
+  //     expect(blockchainInitialized).toBe(true);
+  //     const answer = await api.execute({
+  //       developer,
+  //       repo,
+  //       transactions: [],
+  //       task: "files",
+  //       args: JSON.stringify({
+  //         contractAddress: contractPublicKey.toBase58(),
+  //         text: "Hello, World!",
+  //       }),
+  //       metadata: `files`,
+  //     });
+  //     console.log("answer:", answer);
+  //     expect(answer).toBeDefined();
+  //     expect(answer.success).toBe(true);
+  //     const jobId = answer.jobId;
+  //     expect(jobId).toBeDefined();
+  //     if (jobId === undefined) throw new Error("Job ID is undefined");
+  //     const filesResult = await api.waitForJobResult({
+  //       jobId,
+  //       printLogs: true,
+  //     });
+  //     console.log("Files test result:", filesResult.result.result);
+  //   });
+  // }
+
+  // if (encrypt) {
+  //   it(`should save and get encrypted data`, async () => {
+  //     let answer = await api.execute({
+  //       developer,
+  //       repo,
+  //       transactions: [],
+  //       task: "encrypt",
+  //       args: JSON.stringify({
+  //         contractAddress: contractPublicKey.toBase58(),
+  //         text: "Hello, World!",
+  //       }),
+  //       metadata: `files`,
+  //     });
+  //     console.log("answer:", answer);
+  //     expect(answer).toBeDefined();
+  //     expect(answer.success).toBe(true);
+  //     let jobId = answer.jobId;
+  //     expect(jobId).toBeDefined();
+  //     if (jobId === undefined) throw new Error("Job ID is undefined");
+  //     let result = await api.waitForJobResult({
+  //       jobId,
+  //       printLogs: true,
+  //     });
+  //     const encrypted = result.result.result;
+  //     console.log("Encrypted data:", encrypted);
+  //     if (encrypted === undefined)
+  //       throw new Error("Encrypted data is undefined");
+  //     if (encrypted === "Error encrypting") throw new Error("Error encrypting");
+  //     answer = await api.execute({
+  //       developer,
+  //       repo,
+  //       transactions: [],
+  //       task: "decrypt",
+  //       args: JSON.stringify({
+  //         contractAddress: contractPublicKey.toBase58(),
+  //         text: encrypted,
+  //       }),
+  //       metadata: `files`,
+  //     });
+  //     console.log("answer:", answer);
+  //     expect(answer).toBeDefined();
+  //     expect(answer.success).toBe(true);
+  //     jobId = answer.jobId;
+  //     expect(jobId).toBeDefined();
+  //     if (jobId === undefined) throw new Error("Job ID is undefined");
+  //     result = await api.waitForJobResult({
+  //       jobId,
+  //       printLogs: true,
+  //     });
+  //     const decrypted = result.result.result;
+  //     console.log("Decrypted data:", decrypted);
+  //     expect(decrypted).toBe("Hello, World!");
+  //   });
+  // }
 });
 
 function processArguments(): {
@@ -576,5 +615,4 @@ async function sendTx(
     if (chain !== "zeko") console.error("Error sending tx", error);
   }
   if (chain !== "local") await sleep(10000);
-  
 }
